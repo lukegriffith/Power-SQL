@@ -68,7 +68,7 @@
         		    if ($Retrycount -gt 3){
 			
 			                $retry = $true
-                            $DT = 404   
+                            Write-Error -Exception PowerSQL:QueryFailed -Message "Query did not respond, loop $($Retrycount + 1) of 3"   
         		    }
 		            else {
 			
