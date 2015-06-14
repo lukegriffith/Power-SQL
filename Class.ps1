@@ -13,13 +13,15 @@
 
     databaseConnection( [string]$hostname,[string]$database,[bool]$trusted ){
         
+
         $this.hostname = $hostname
         $this.database = $database
         $this.trusted = $trusted
         $this.connectionString = "Server=$hostname;Database=$database;Trusted_Connection=$($trusted.tostring());"
         
+      
 
-        # Tables logic 
+     
         
     
 
@@ -35,6 +37,7 @@
         $this.hostname = $hostname
         $this.database = $database
         $this.connectionString = "Server=$hostname;Database=$database;User Id=$username;Password=$password;"
+
 
     }
 
@@ -92,6 +95,44 @@
 
     }
 
+    [void]ConnectionTest() {
+            try {
+                    if ($this.hostname -match "\\") 
+                    { 
+                        $server = $this.hostname.split("\")[0]; $this.connectionStatus = (Test-Connection -ComputerName $server -Quiet) 
+                    } 
+                    else 
+                    {
+                        $this.connectionStatus = (Test-Connection -ComputerName $this.hostname -Quiet); 
+                    } 
+                } 
+                catch 
+                { 
+                    Write-Error -Exception Power-SQL:NetworkConnectivity -Message "Unable to ping instance"; break
+                }
+
+            try {   
+                if ($this.hostname -match ":") { 
+                    $port = $this.hostname.split(":")[1] ; 
+                    $server = $this.hostname.split("\")[0] ;
+        
+                    $tcp = New-Object System.Net.Sockets.TcpClient ;
+                    $tcp.connect($server, $port) ;
+                    $this.connectionStatus = $tcp.Connected ;
+                } else 
+                {
+                    if ($this.hostname -match "\\") {$server = $this.hostname.split("\")[0]} else { $server = $this.hostame } 
+                    $tcp = New-Object System.Net.Sockets.TcpClient ;
+                    $tcp.connect($server, "1433") ;
+                    $this.connectionStatus = $tcp.Connected ;
+
+                }
+            }
+            catch {
+                Write-Error -Exception Power-SQL:PortConnectivity -Message "Unable to connect to instance on specified port"
+            }
+    }
+
 
 }
 
@@ -105,7 +146,7 @@ class Table {
     [string]$type
     [system.object]$columns
 
-    name(){ "$($this.schema)\$($this.tableName)" }
+    [string]name(){ return "[$($this.schema)].[$($this.tableName)]" }
 
     Table([System.Data.DataRow]$table, [System.Data.DataTable]$columns) {
 
@@ -120,3 +161,4 @@ class Table {
     }
 
 }
+
