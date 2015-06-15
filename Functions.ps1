@@ -108,3 +108,26 @@ function Invoke-PowerSQL {
 
 
 }
+
+### Need to test
+
+function enter-PowerSQL {
+    
+    [cmdletbinding()]
+    $exitCondition = $true
+    write-output "Enter SQL query - Exit; to exit"
+    while ($true)
+    {
+
+        $inputString += Read-Host
+        $inputString += "`n"
+        if ($inputString -match "(E|e)xit;") {break; break}
+        if ($inputString -match ".*;$") { break }
+        
+        
+        
+    }
+    $inputString
+    #$PowerSQLContext.query($inputString)
+    
+}
