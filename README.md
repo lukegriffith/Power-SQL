@@ -1,6 +1,6 @@
 # Power-SQL
 Framework to query SQL server databases. 
-Requires PowerShell v5
+Requires PowerShell v5 or v4
 
 Connect-PowerSQL
 
