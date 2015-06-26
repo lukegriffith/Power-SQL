@@ -17,7 +17,7 @@
         $this.hostname = $hostname
         $this.database = $database
         $this.trusted = $trusted
-        $this.connectionString = "Server=$hostname;Database=$database;Trusted_Connection=$($trusted.tostring());"
+        $this.connectionString = "Server=$hostname;Database=$database;Trusted_Connection=$($trusted.tostring());Application Name=PowerSQL;"
         
       
 
@@ -162,3 +162,15 @@ class Table {
 
 }
 
+# Look at creating an editor for TSQL.
+
+class display {
+	
+	[int]$lines
+	
+	
+}
+
+if ($Host.UI.RawUI.KeyAvailable) {
+    $key = $Host.UI.RawUI.ReadKey()
+}
