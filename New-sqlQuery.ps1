@@ -4,7 +4,7 @@
     [Parameter(Mandatory=$true)]
         $Query,
     [Parameter(Mandatory=$false)]
-        $ConnectionString = "server=Helpdesk_DR;database=supportworks_db_ext;User Id=DataWarehouseUser;Password=Str4da130TCAbaRth*66;trusted_connection=False;"
+        $ConnectionString
     )
 
 
