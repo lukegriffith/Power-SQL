@@ -42,7 +42,7 @@ function Connect-PowerSQL {
         [string]$hostname,
         [parameter(mandatory=$true)]
         [string]$database,
-        [switch]$loadSchema,
+        #[switch]$loadSchema,
         [parameter(parameterSetName="PSCredential")]
         [pscredential]$Credentials,
         [parameter(parameterSetName="username")]
@@ -50,38 +50,37 @@ function Connect-PowerSQL {
         [string]$password
         )
 
-        if ($psversiontable.psversion.major -eq 5)
-        {
-
-        if ($PSCmdlet.ParameterSetName -eq "Trusted") {$store = [DatabaseConnection]::new($hostname,$database, $true)}
-        elseif ($PSCmdlet.ParameterSetName -eq "PSCredential") {$store = [DatabaseConnection]::new($hostname,$database,$Credentials)}
-        elseif ($PSCmdlet.ParameterSetName -eq "username") { if ($username -and $password) { $store = [DatabaseConnection]::new($hostname,$database,$username,$password) } else { Write-Error -Exception UsernameOrPassword -Message "missing $(if (!$username){"username"}else{"password"})"}} 
-        else { Write-Error -Exception sqlModuleException -Message "Something has gone horribly wrong" } 
+        # if ($psversiontable.psversion.major -eq 5)
+        # {
+        # 
+        # if ($PSCmdlet.ParameterSetName -eq "Trusted") {$store = [DatabaseConnection]::new($hostname,$database, $true)}
+        # elseif ($PSCmdlet.ParameterSetName -eq "PSCredential") {$store = [DatabaseConnection]::new($hostname,$database,$Credentials)}
+        # elseif ($PSCmdlet.ParameterSetName -eq "username") { if ($username -and $password) { $store = [DatabaseConnection]::new($hostname,$database,$username,$password) } else { Write-Error -Exception UsernameOrPassword -Message "missing $(if (!$username){"username"}else{"password"})"}} 
+        # else { Write-Error -Exception sqlModuleException -Message "Something has gone horribly wrong" } 
+        # 
+        # 
+        # try {
+        # $store.ConnectionTest()
+        # } catch { break; }
+        # 
+        # 
+        # if ($loadSchema) {
+        # 
+        # $store.loadSchema()
+        # }
+        # 
+        # 
+        # $store
+        # }
         
-
-        try {
-        $store.ConnectionTest()
-        } catch { break; }
-
-
-        if ($loadSchema) {
-
-        $store.loadSchema()
-        }
-        
-
-        $Global:SQLDatabaseContext = $store
-        $store
-        }
-        
-        elseif ($psversiontable.psversion.major -eq 4)
+        if ($psversiontable.psversion.major -eq 4 -or $psversiontable.psversion.major -eq 5)
         {
             if ($PSCmdlet.ParameterSetName -eq "PSCredential"){
-                $GLOBAL:SQLDatabaseContext = New-DatabaseConnection -hostname $hostname -database $database -Credentials $Credentials
+                New-DatabaseConnection -hostname $hostname -database $database -Credentials $Credentials
                }
             elseif ($PSCmdlet.ParameterSetName -eq "username")
             {
-                $GLOBAL:SQLDatabaseContext = New-DatabaseConnection -hostname $hostname -database $database -username $username -password $password
+                 New-DatabaseConnection -hostname $hostname -database $database -username $username -password $password
             }
            
         }
@@ -114,23 +113,18 @@ function Invoke-PowerSQL {
         [PSObject]$PowerSQLContext
     )
 
-    if (!$Global:SQLDatabaseContext -and !$PowerSQLContext) { Write-Error -Exception Power-SQL:DatabaseNotConnected -Message "no context proivded. Maybe`$GLOBAL:SQLDatabaseContext not set, run Connect-sqlDB"; break}
+    if (!$PowerSQLContext) { Write-Error -Exception Power-SQL:DatabaseNotConnected -Message "no context proivded. run Connect-sqlDB"; break}
 
-    if ($PSCmdlet.ParameterSetName -eq "stringQuery" -and $psversiontable.psversion.major -eq 5) { $Global:SQLDatabaseContext.query($query) }
+    if ($PSCmdlet.ParameterSetName -eq "stringQuery") {New-sqlQuery -query $query -connectionstring $PowerSQLContext.connectionstring }
 
-    elseif ($PSCmdlet.ParameterSetName -eq "stringQuery" -and $psversiontable.psversion.major -eq 4) {New-sqlQuery -query $query -connectionstring $SQLDatabaseContext.connectionstring }
+    elseif ($PSCmdlet.ParameterSetName -eq "File") {  $query = Get-Item $path | Get-Content ;
+                                                      New-sqlQuery -query $query -connectionstring $PowerSQLContext.connectionstring }
 
-    elseif ($PSCmdlet.ParameterSetName -eq "File" -and $psversiontable.psversion.major -eq 5) { $query = Get-Item $Path | Get-Content; $Global:SQLDatabaseContext.query($query) }
-
-    elseif ($PSCmdlet.ParameterSetName -eq "File" -and $psversiontable.psversion.major -eq 4) { New-sqlQuery -query $query -connectionstring $SQLDatabaseContext.connectionstring }
-
-    else { write-error -exception PowerSQLPSVerions -message "This version of PowerShell is not supported"}
-    
-    
-    if ($PowerSQLContext) {
+ 
+    elseif ($PSCmdlet.ParameterSetName -eq "SpecifiedContext") {
 
         if ($path) { $query = Get-Item $path | Get-Content }
-        $PowerSQLContext.query($query)
+        New-sqlQuery -query $query -connectionstring $PowerSQLContext.connectionstring
     }
 
 
