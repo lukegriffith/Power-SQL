@@ -11,16 +11,16 @@ $script:conn = @()
 Function New-SQLConnection {
 
     param(
-    [parameter(Mandatory=$true,HelpMessage="Name of connection.")]
-    [string]$Name,
-    [parameter(ParameterSetName="ConnectionString",Mandatory=$true,HelpMessage="Specify full connection string.")]
-    [String]$ConnectionString,
-    [parameter(ParameterSetName="ConnectionBuilder",Mandatory=$true,HelpMessage="Server name, specify instace <server>\<instance>")]
-    [String]$Server,
-    [parameter(ParameterSetName="ConnectionBuilder",HelpMessage="Specify database name.")]
-    [String]$Database,
-    [parameter(ParameterSetName="ConnectionBuilder",HelpMessage="provide a PS Credential object, if left empty expects a trusted connection.")]
-    [PSCredential]$Credential
+        [parameter(Mandatory=$true,HelpMessage="Name of connection.")]
+        [string]$Name,
+        [parameter(ParameterSetName="ConnectionString",Mandatory=$true,HelpMessage="Specify full connection string.")]
+        [String]$ConnectionString,
+        [parameter(ParameterSetName="ConnectionBuilder",Mandatory=$true,HelpMessage="Server name, specify instace <server>\<instance>")]
+        [String]$Server,
+        [parameter(ParameterSetName="ConnectionBuilder",HelpMessage="Specify database name.")]
+        [String]$Database,
+        [parameter(ParameterSetName="ConnectionBuilder",HelpMessage="provide a PS Credential object, if left empty expects a trusted connection.")]
+        [PSCredential]$Credential
     )
 
     $conn = New-Object System.Data.SqlClient.SqlConnection;
@@ -54,12 +54,20 @@ Function New-SQLConnection {
 Function Open-SQLConnection {
     [cmdletbinding()]
     param(
-    [parameter(Mandatory=$true,HelpMessage="Name of connection.")]
-    [string]$Name
+        [parameter(Mandatory=$true,HelpMessage="Name of connection.")]
+        [string]$Name
     )
 
     $conn = $script:conn | Where-Object {$_.name -like $Name} 
-    $conn.open()    
+    
+    if ($conn -and $conn.State -eq "Closed") {
+        Write-Verbose "Opening Connection to database $($conn.Database)." # Verbose Stream isn't working
+
+        $conn.open()    
+    } 
+    else {
+        Write-Verbose "Connection is already open."
+    }
     
 }
 
@@ -74,7 +82,7 @@ Function Set-SQLDatabase {
     )
 
 
-    $conn = $script:conn | Where-Object {$_.name -eq $name}
+    $conn = $script:conn | Where-Object {$_.name -like $name}
 
     try {
         Write-Verbose "Changing database from $($conn.Database) to $database"
@@ -89,25 +97,32 @@ Function Set-SQLDatabase {
 Function Get-SQLConnection {
     [cmdletbinding()]
     param(
-    [string]$name
+        [string]$name
     )
 
     if ($name) {
-    $script:conn | Where-Object {$_.name -eq $name} 
+        $script:conn | Where-Object {$_.name -like $name} 
     }
     else {
-    $script:conn
+        $script:conn
     }
 
 }
 
 Function Invoke-SQLQuery {
     [cmdletbinding()]
-    param([string]$query)
+    param(
+        [parameter(Mandatory=$true)]
+        [string]$Name,
+        [parameter(Mandatory=$true)]
+        [string]$query
+    )
 
-    Write-Verbose "executing query against database $($script:conn.database)"
+    $conn = $script:conn | Where-Object {$_.name -like $name} 
+
+    Write-Verbose "executing query against database $($conn.database)"
     try {
-        $command = $script:conn.CreateCommand()
+        $command = $conn.CreateCommand()
         $command.CommandText = $query
     }
     catch {
@@ -131,16 +146,24 @@ Function Invoke-SQLQuery {
 
 Function Close-SQLConnection {
     [cmdletbinding()]
-    param()
+    param(
+        [Parameter(Mandatory=$true)]
+        $Name
+    )
+
+    $conn = $script:conn | Where-Object {$_.Name -like $Name}
     try {
         Write-Verbose "Closing connection to $($script:conn.DataSource)"
-        $script:conn.Close()
+
+        if ($conn.state -eq "Open") {
+            $conn.Close()
+        }
     }
     catch {
         Write-Error "Could not close SQL connection" -Exception PowerSQL.CouldNotClose
         break
     }
-    $script:closed = $true
+
 
 }
     
