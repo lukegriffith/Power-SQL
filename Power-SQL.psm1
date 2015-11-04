@@ -1,6 +1,6 @@
 ﻿# Importing the module creates a new private connection object.
 # TO DO 
-# 1. Update Close and Invoke as they currently do not work in the net setup.
+# 1. Update Close and Invoke as they currently do not work in the net setup. - Done
 # 2. Allow for pipeline input for ALL cmdlets, besides New-SQLConnection... Maybe Get can take pipeline input for name? 
 # 3. Create pester tests for module to ensure functionality works.
 # 4. Work on naming conventions.
