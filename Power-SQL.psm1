@@ -1,12 +1,11 @@
 ﻿# Importing the module creates a new private connection object.
 # TO DO 
-# 1. Update Close and Invoke as they currently do not work in the net setup. - Done
-# 2. Allow for pipeline input for ALL cmdlets, besides New-SQLConnection... Maybe Get can take pipeline input for name? 
-# 3. Create pester tests for module to ensure functionality works.
-# 4. Work on naming conventions.
+# 1. Create pester tests for module to ensure functionality works.
+# 2. Work on naming conventions.
 
 $script:conn = @()
 
+[System.Data.SqlClient.SqlConnection]$script:defaultConn
 
 Function New-SQLConnection {
 
@@ -20,7 +19,9 @@ Function New-SQLConnection {
         [parameter(ParameterSetName="ConnectionBuilder",HelpMessage="Specify database name.")]
         [String]$Database,
         [parameter(ParameterSetName="ConnectionBuilder",HelpMessage="provide a PS Credential object, if left empty expects a trusted connection.")]
-        [PSCredential]$Credential
+        [PSCredential]$Credential,
+        [parameter(HelpMessage="Set context as default connection")]
+        [switch]$SetAsDefault
     )
 
     $conn = New-Object System.Data.SqlClient.SqlConnection;
@@ -49,47 +50,62 @@ Function New-SQLConnection {
 
     $Script:conn += $conn
 
+    if ($SetAsDefault) {
+        Write-Verbose "Setting conenction as default"
+        $script:defaultConn = $conn
+    }
+
 }
 
 Function Open-SQLConnection {
     [cmdletbinding()]
     param(
-        [parameter(Mandatory=$true,HelpMessage="Name of connection.")]
+        [parameter(ValueFromPipelineByPropertyName=$true,Mandatory=$true,HelpMessage="Name of connection.")]
         [string]$Name
     )
 
-    $conn = $script:conn | Where-Object {$_.name -like $Name} 
-    
-    if ($conn -and $conn.State -eq "Closed") {
-        Write-Verbose "Opening Connection to database $($conn.Database)." # Verbose Stream isn't working
+    Process {
+        $conn = $script:conn | Where-Object {$_.name -like $Name} 
+        
+        if ($conn -and $conn.State -eq "Closed") {
+            Write-Verbose "Opening Connection to database $($conn.Database)." # Verbose Stream isn't working
 
-        $conn.open()    
-    } 
-    else {
-        Write-Verbose "Connection is already open."
+            $conn.open()    
+        } 
+        else {
+            Write-Verbose "Connection is already open."
+        }
     }
     
 }
 
 
-Function Set-SQLDatabase {
+Function Set-SQLConnection {
     [cmdletbinding()]
     param(
         [Parameter(Mandatory=$true)]
         [string]$name,
-        [Parameter(Mandatory=$true)]
-        [string]$database
+        [string]$database,
+        [switch]$SetAsDefault
     )
 
 
     $conn = $script:conn | Where-Object {$_.name -like $name}
 
-    try {
-        Write-Verbose "Changing database from $($conn.Database) to $database"
-        $conn.ChangeDatabase($database)
-    } 
-    catch {
-        Write-Error "$($_.exception)" -Exception PowerSQL.ChangeDatabaseError
+
+    if ($database) {
+        try {
+            Write-Verbose "Changing database from $($conn.Database) to $database"
+            $conn.ChangeDatabase($database)
+        } 
+        catch {
+            Write-Error "$($_.exception)" -Exception PowerSQL.ChangeDatabaseError
+        }
+    }
+
+    if ($SetAsDefault) {
+        Write-Verbose "Set $name connection as default"
+        $script:defaultConn = $conn
     }
 
 }
@@ -112,58 +128,74 @@ Function Get-SQLConnection {
 Function Invoke-SQLQuery {
     [cmdletbinding()]
     param(
-        [parameter(Mandatory=$true)]
+        [parameter(ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
         [string]$Name,
         [parameter(Mandatory=$true)]
         [string]$query
     )
 
-    $conn = $script:conn | Where-Object {$_.name -like $name} 
+    Process {
 
-    Write-Verbose "executing query against database $($conn.database)"
-    try {
-        $command = $conn.CreateCommand()
-        $command.CommandText = $query
+
+        if ($name) {
+            $conn = $script:conn | Where-Object {$_.name -like $name} 
+        }
+        elseif($script:defaultConn) {
+            $conn = $script:defaultConn
+        } else {
+            Write-Error "Please specify connection"
+        }
+
+        Write-Verbose "executing query against database $($conn.database)"
+        try {
+            $command = $conn.CreateCommand()
+            $command.CommandText = $query
+        }
+        catch {
+            Write-Error "Unable to create DBcommand"
+            break
+        }
+        
+        Write-Verbose "Creating new datatable"
+        $table = new-object “System.Data.DataTable”
+
+        Write-Verbose "Executing reader"
+        $data = $command.ExecuteReader()
+
+        Write-Verbose "Loading reader result into datatable"
+        $table.load($data)
+
+        $table
+
+
     }
-    catch {
-        Write-Error "Unable to create DBcommand"
-        break
-    }
-
-    Write-Verbose "Creating new datatable"
-    $table = new-object “System.Data.DataTable”
-
-    Write-Verbose "Executing reader"
-    $data = $command.ExecuteReader()
-
-    Write-Verbose "Loading reader result into datatable"
-    $table.load($data)
-
-    $table
-
 
 }
 
 Function Close-SQLConnection {
     [cmdletbinding()]
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
         $Name
     )
 
-    $conn = $script:conn | Where-Object {$_.Name -like $Name}
-    try {
-        Write-Verbose "Closing connection to $($script:conn.DataSource)"
 
-        if ($conn.state -eq "Open") {
-            $conn.Close()
+    Process {
+
+        $conn = $script:conn | Where-Object {$_.Name -like $Name}
+        try {
+            Write-Verbose "Closing connection to $($script:conn.DataSource)"
+
+            if ($conn.state -eq "Open") {
+                $conn.Close()
+            }
         }
-    }
-    catch {
-        Write-Error "Could not close SQL connection" -Exception PowerSQL.CouldNotClose
-        break
-    }
+        catch {
+            Write-Error "Could not close SQL connection" -Exception PowerSQL.CouldNotClose
+            break
+        }
 
-
+        
+    }
 }
     
